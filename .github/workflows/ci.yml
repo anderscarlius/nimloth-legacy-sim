@@ -1,0 +1,44 @@
+name: CI
+
+# B4 Etapp 1 (S1 — lokalt bara denna etapp): typecheck + test som grind.
+# Ingen ghcr-publish här — deploy är en egen beslutspunkt i en senare etapp.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: legacy_sim
+          POSTGRES_USER: legacy_sim
+          POSTGRES_PASSWORD: legacy_sim
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5433"
+      PGDATABASE: legacy_sim
+      PGUSER: legacy_sim
+      PGPASSWORD: legacy_sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test

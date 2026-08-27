@@ -1,0 +1,31 @@
+# Fristående — egen Postgres, ingen delning med nimloth-core:s core-db.
+# S2: den här tjänsten ska vara isolerad, inte sammanflätad med produktkod.
+
+services:
+  legacy-sim-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: legacy_sim
+      POSTGRES_USER: legacy_sim
+      POSTGRES_PASSWORD: legacy_sim
+    ports:
+      - "5433:5432"
+    volumes:
+      - legacy-sim-db-data:/var/lib/postgresql/data
+
+  legacy-sim:
+    build: .
+    environment:
+      PORT: "11601"
+      PGHOST: legacy-sim-db
+      PGPORT: "5432"
+      PGDATABASE: legacy_sim
+      PGUSER: legacy_sim
+      PGPASSWORD: legacy_sim
+    ports:
+      - "11601:11601"
+    depends_on:
+      - legacy-sim-db
+
+volumes:
+  legacy-sim-db-data:
