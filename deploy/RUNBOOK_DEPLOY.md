@@ -15,11 +15,17 @@ körning.
 
 ## Deploy
 
+**Fynd, Fas C (2026-08-28):** `/opt/nimloth-deploy` ägs av `nsf-agent`,
+0700 — varken läsbart eller skrivbart för `anderscarlius`. Katalogen
+skapas en gång via `sudo` + `chown` (nedan); det delade `.env`-token-
+filen förblir `nsf-agent`-ägd, `deploy.sh` läser den via `sudo cat`
+(inbyggt, `anderscarlius` har passwordless sudo).
+
 ```bash
 GIT_SHA=$(git rev-parse --short=7 HEAD)
 IMAGE_TAG="sha-${GIT_SHA}"
 
-ssh anderscarlius@192.168.1.220 "mkdir -p /opt/nimloth-deploy/nimloth-legacy-sim"
+ssh anderscarlius@192.168.1.220 "sudo mkdir -p /opt/nimloth-deploy/nimloth-legacy-sim && sudo chown anderscarlius:anderscarlius /opt/nimloth-deploy/nimloth-legacy-sim"
 scp deploy/docker-compose.moria.yml deploy/deploy.sh \
     anderscarlius@192.168.1.220:/opt/nimloth-deploy/nimloth-legacy-sim/
 ssh anderscarlius@192.168.1.220 "chmod +x /opt/nimloth-deploy/nimloth-legacy-sim/deploy.sh"
