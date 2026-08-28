@@ -1,0 +1,82 @@
+name: Bygg och pusha till ghcr.io
+
+# B7. S1 i Etapp 1 sa uttryckligen "ingen ghcr-publish denna etapp — S1,
+# lokalt bara". Den begränsningen gällde just Etapp 1; B7 auktoriserar
+# publicering uttryckligen (S11). ci.yml (typecheck/build/test på push
+# OCH pull_request) lämnas orörd — den täcker PR-validering som denna
+# workflow (push-till-main-bara) inte gör.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: legacy_sim
+          POSTGRES_USER: legacy_sim
+          POSTGRES_PASSWORD: legacy_sim
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: "5433"
+      PGDATABASE: legacy_sim
+      PGUSER: legacy_sim
+      PGPASSWORD: legacy_sim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  publish:
+    name: Bygg och pusha till ghcr.io
+    needs: [test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/nimloth-legacy-sim
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
