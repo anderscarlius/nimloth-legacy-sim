@@ -1,0 +1,58 @@
+# B7 — Moria pull-deploy för nimloth-legacy-sim. Egen, isolerad Postgres
+# (namngiven volym för demo-persistens — INTE samma sak som CI:s
+# engångs-Postgres). Delar det externa nätverket "b4-chain" med
+# migration-gateways egen compose-fil (nimloth-core, annat repo) —
+# skapas idempotent av respektive deploy.sh, oavsett vilken som körs
+# först.
+
+services:
+  legacy-sim-db:
+    image: postgres:16-alpine
+    container_name: legacy-sim-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: legacy_sim
+      POSTGRES_USER: legacy_sim
+      POSTGRES_PASSWORD: legacy_sim
+    volumes:
+      - legacy-sim-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "legacy_sim"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - b4-chain
+
+  nimloth-legacy-sim:
+    image: ghcr.io/anderscarlius/nimloth-legacy-sim:${IMAGE_TAG:?IMAGE_TAG måste anges explicit, t.ex. sha-abc1234}
+    container_name: nimloth-legacy-sim
+    restart: unless-stopped
+    environment:
+      PGHOST: legacy-sim-db
+      PGPORT: "5432"
+      PGDATABASE: legacy_sim
+      PGUSER: legacy_sim
+      PGPASSWORD: legacy_sim
+      PORT: "11601"
+    depends_on:
+      legacy-sim-db:
+        condition: service_healthy
+    ports:
+      # Portstrategi.md 11600-blocket (Rekvisita & engångsmotparter),
+      # redan allokerad B4 Etapp 1.
+      - "11601:11601"
+    networks:
+      - b4-chain
+    labels:
+      - "com.nimloth.service=nimloth-legacy-sim"
+      - "com.nimloth.demoInstance=true"
+      # Ingen Traefik-exponering — legacy-sim är rekvisita bakom
+      # gatewayen, aldrig en egen publik yta (D4/D6-taket).
+
+networks:
+  b4-chain:
+    external: true
+
+volumes:
+  legacy-sim-db-data:
